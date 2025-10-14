@@ -143,23 +143,31 @@ if __name__ == '__main__':
     
     try:
         # can0 = CAR CAN bus, can1 = RADAR CAN bus
-        can_bus1 = can.interface.Bus(bustype='socketcan', channel='can0', bitrate=500000)
-        can_bus2 = can.interface.Bus(bustype='socketcan', channel='can1', bitrate=500000)
+        can_bus1 = can.interface.Bus(interface='socketcan', channel='can0', bitrate=500000)
+        can_bus2 = can.interface.Bus(interface='socketcan', channel='can1', bitrate=500000)
         print("✓ CAN buses initialized successfully")
     except Exception as e:
         print(f"ERROR: Failed to initialize CAN buses: {e}")
         sys.exit(1)
     
     try:
-        db = cantools.db.load_file('opendbc/toyota_prius_2017_pt_generated.dbc')
-        print("✓ DBC file loaded")
+        # Try to load DBC file with strict=False to handle parsing errors
+        db = cantools.db.load_file('opendbc/toyota_prius_2017_pt_generated.dbc', strict=False)
+        print("✓ DBC file loaded (non-strict mode)")
     except FileNotFoundError:
         print("ERROR: DBC file not found!")
         print("Run: git submodule update --init")
         sys.exit(1)
     except Exception as e:
         print(f"ERROR: Failed to load DBC file: {e}")
-        sys.exit(1)
+        print("\nTrying alternative DBC file...")
+        try:
+            # Try the ADAS DBC as fallback
+            db = cantools.db.load_file('opendbc/toyota_prius_2017_adas.dbc', strict=False)
+            print("✓ Loaded alternative DBC file")
+        except:
+            print("ERROR: Could not load any DBC file. Exiting.")
+            sys.exit(1)
     
     print("\n" + "=" * 60)
     print("Starting radar spoofing sequence...")
