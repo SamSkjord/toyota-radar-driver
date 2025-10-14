@@ -37,7 +37,7 @@ iface can1 inet manual
 class OnCan(can.Listener):
     def __init__(self):
         try:
-            self.db = cantools.db.load_file('opendbc/toyota_prius_2017_adas.dbc')
+            self.db = cantools.database.load_file('opendbc/toyota_prius_2017_adas.dbc', strict=False)
         except FileNotFoundError:
             print("Warning: DBC file not found. Run: git submodule update --init")
             self.db = None
@@ -152,7 +152,7 @@ if __name__ == '__main__':
     
     try:
         # Try to load DBC file with strict=False to handle parsing errors
-        db = cantools.db.load_file('opendbc/toyota_prius_2017_pt_generated.dbc', strict=False)
+        db = cantools.database.load_file('opendbc/toyota_prius_2017_pt_generated.dbc', strict=False)
         print("✓ DBC file loaded (non-strict mode)")
     except FileNotFoundError:
         print("ERROR: DBC file not found!")
@@ -163,7 +163,7 @@ if __name__ == '__main__':
         print("\nTrying alternative DBC file...")
         try:
             # Try the ADAS DBC as fallback
-            db = cantools.db.load_file('opendbc/toyota_prius_2017_adas.dbc', strict=False)
+            db = cantools.database.load_file('opendbc/toyota_prius_2017_adas.dbc', strict=False)
             print("✓ Loaded alternative DBC file")
         except:
             print("ERROR: Could not load any DBC file. Exiting.")
@@ -282,8 +282,20 @@ if __name__ == '__main__':
         print("\n\nStopping radar control...")
     except Exception as e:
         print(f"\nERROR: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
-        notifier.stop()
-        can_bus1.shutdown()
-        can_bus2.shutdown()
+        print("\nCleaning up...")
+        try:
+            notifier.stop()
+        except:
+            pass
+        try:
+            can_bus1.shutdown()
+        except:
+            pass
+        try:
+            can_bus2.shutdown()
+        except:
+            pass
         print("CAN buses shut down. Goodbye!")
