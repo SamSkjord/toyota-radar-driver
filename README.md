@@ -74,7 +74,7 @@ The examples in this repository assume:
 ## Using the Radar Driver
 
 ```bash
-python3 radar_callbacks.py
+sudo python3 radar_callbacks.py
 ```
 
 This starts the driver, registers a simple logging callback, and prints a running summary. Key flags:
@@ -104,7 +104,7 @@ Call `driver.stop()` during shutdown to tear down threads and CAN handles.
 ## Curses Visualization
 
 ```bash
-python3 radar_curses.py
+sudo python3 radar_curses.py
 ```
 
 The UI shows a plan-view grid of targets and a textual panel with distances, lateral offsets, relative speed, and track age. Press `q` to exit. Tune layout/behavior with flags such as `--max-long`, `--max-lat`, and `--refresh-hz`.
