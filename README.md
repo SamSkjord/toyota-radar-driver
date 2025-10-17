@@ -3,7 +3,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.7%2B-blue)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi-red)](https://www.raspberrypi.org/)
-[![AI Slop](https://img.shields.io/badge/AI%20Slop%20-%20ChatGPT20Codex%205-beige)](https://www.morningstar.com/news/marketwatch/20251003175/the-ai-bubble-is-17-times-the-size-of-the-dot-com-frenzy-and-four-times-subprime-this-analyst-argues)
+[![AI Slop](https://img.shields.io/badge/AI%20Slop%20-%20ChatGPT%20Codex%205-beige)](https://www.morningstar.com/news/marketwatch/20251003175/the-ai-bubble-is-17-times-the-size-of-the-dot-com-frenzy-and-four-times-subprime-this-analyst-argues)
 
 Utilities for bringing up, visualizing, and experimenting with Toyota millimeter‑wave radar modules over CAN. The repository focuses on a reusable radar driver that can be embedded in other projects, plus two ready‑to‑run examples. It builds upon the excellent work in [frk2/toyoyta_radar_control_can](https://github.com/frk2/toyoyta_radar_control_can).
 
