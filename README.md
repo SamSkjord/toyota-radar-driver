@@ -1,247 +1,116 @@
-# Toyota Radar Control - Raspberry Pi Setup Guide
+# Toyota Radar Toolkit
 
-This guide will help you set up the Toyota radar control system on a Raspberry Pi with a Waveshare dual CAN hat.
+Utilities for bringing up, visualizing, and experimenting with Toyota millimeter‑wave radar modules over CAN. The repository focuses on a reusable radar driver that can be embedded in other projects, plus two ready‑to‑run examples. It builds upon the excellent work in [frk2/toyoyta_radar_control_can](https://github.com/frk2/toyoyta_radar_control_can).
 
-## Hardware Requirements
+## Repository Layout
 
-- Raspberry Pi (3/4/5 recommended)
-- Waveshare RS485 CAN HAT or 2-CH CAN HAT
-- Toyota radar unit (2016+ with TSS - Corolla, RAV4, Highlander, Camry)
-- 12V power supply for radar
-- CAN bus cables/connectors
+- `toyota_radar_driver.py` – modular radar driver that:
+  - Optionally configures the CAN interfaces (`ip link set …`).
+  - Loads the Prius ADAS and PT DBC files to decode radar tracks and keep the radar awake.
+  - Sends the wake-up burst and runs a keep-alive loop on the vehicle bus.
+  - Exposes decoded track data via callbacks and a cached `get_tracks()` API.
+- `radar_curses.py` – terminal (curses) visualization of radar targets using the shared driver.
+- `radar_callbacks.py` – minimal callback example that logs tracks and prints periodic summaries.
+- `toyota_radar_debug.py` / `toyota_radar_rpi.py` – earlier standalone scripts kept for reference; they directly manage CAN buses without the new driver abstractions.
+- `fix_dbc.py` and the `opendbc/` submodule – helper tooling and DBC definitions pulled from Comma.ai’s OpenDBC project.
 
-## Waveshare CAN Hat Configuration
+## Requirements
 
-The Waveshare dual CAN hat uses MCP2515 CAN controllers connected via SPI.
+- Python 3.8+
+- [`python-can`](https://python-can.readthedocs.io/) with SocketCAN support on Linux.
+- [`cantools`](https://cantools.readthedocs.io/) for DBC decoding.
+- Toyota radar hardware connected via two CAN channels (`car` bus and `radar` bus).
 
-### 1. Enable SPI Interface
-
-```bash
-sudo raspi-config
-# Navigate to: Interface Options → SPI → Enable
-```
-
-Or edit `/boot/config.txt` directly:
-```bash
-sudo nano /boot/config.txt
-```
-
-Add these lines:
-```
-dtparam=spi=on
-dtoverlay=mcp2515-can0,oscillator=12000000,interrupt=25
-dtoverlay=mcp2515-can1,oscillator=16000000,interrupt=24
-```
-
-**Note**: Adjust the oscillator frequency based on your Waveshare model:
-- Most Waveshare hats use 12 MHz or 16 MHz crystals
-- Check your specific model documentation
-
-### 2. Install Required Packages
+Install Python dependencies with:
 
 ```bash
-# Update system
-sudo apt-get update
-sudo apt-get upgrade
-
-# Install CAN utilities
-sudo apt-get install can-utils
-
-# Install Python dependencies
-sudo apt-get install python3-pip
-pip3 install python-can
-pip3 install cantools
+python3 -m pip install -r requirements.txt  # create one if needed
 ```
 
-### 3. Clone Repository
+If you do not maintain a `requirements.txt`, install ad hoc:
 
 ```bash
-cd ~
-git clone https://github.com/frk2/toyoyta_radar_control_can.git
-cd toyoyta_radar_control_can
-git submodule update --init
+python3 -m pip install python-can cantools
 ```
 
-### 4. Configure CAN Interfaces
+## CAN Interface Setup
 
-Create a script to automatically configure CAN interfaces on boot:
+All scripts assume two SocketCAN interfaces, typically `can0` (car bus) and `can1` (radar bus), at 500 kbps. The driver can optionally bring the interfaces up for you; otherwise run:
 
 ```bash
-sudo nano /usr/local/bin/setup-can.sh
-```
-
-Add:
-```bash
-#!/bin/bash
-ip link set can0 type can bitrate 500000
-ip link set can0 up
-ip link set can1 type can bitrate 500000
-ip link set can1 up
-```
-
-Make it executable:
-```bash
-sudo chmod +x /usr/local/bin/setup-can.sh
-```
-
-Create a systemd service:
-```bash
-sudo nano /etc/systemd/system/can-setup.service
-```
-
-Add:
-```ini
-[Unit]
-Description=Setup CAN interfaces
-After=network.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/setup-can.sh
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable the service:
-```bash
-sudo systemctl enable can-setup.service
-sudo systemctl start can-setup.service
-```
-
-## Wiring Connections
-
-### Toyota Radar Pinout
-```
-Pin | Function
-----|------------------
-1   | GND
-2   | Car CAN Low
-3   | Car CAN High
-5   | Radar CAN High
-6   | Radar CAN Low
-8   | 12V VCC
-```
-
-### Waveshare to Radar Connections
-
-**CAN0 (Car CAN Bus)**
-- Connect to pins 2 (CAN Low) and 3 (CAN High) on radar
-
-**CAN1 (Radar CAN Bus)**
-- Connect to pins 5 (CAN High) and 6 (CAN Low) on radar
-
-**Power**
-- Connect 12V to pin 8
-- Connect GND to pin 1
-
-## Testing the Setup
-
-### 1. Verify CAN Interfaces
-
-```bash
-ip link show can0
-ip link show can1
-```
-
-Both should show as UP and RUNNING.
-
-### 2. Test CAN Communication
-
-Open two terminals:
-
-**Terminal 1 - Listen on can0:**
-```bash
-candump can0
-```
-
-**Terminal 2 - Send test message on can0:**
-```bash
-cansend can0 123#DEADBEEF
-```
-
-You should see the message appear in Terminal 1.
-
-### 3. Run the Radar Control Script
-
-```bash
-cd ~/toyoyta_radar_control_can
-sudo python3 spoof_dsu.py
-```
-
-If successful, you should see output like:
-```
-Got VALID track at dist: 2.44
-Got VALID track at dist: 2.4
-```
-
-## Troubleshooting
-
-### Issue: CAN interfaces not appearing
-
-**Check kernel modules:**
-```bash
-lsmod | grep can
-lsmod | grep mcp
-```
-
-You should see: `can`, `can_raw`, `can_dev`, `mcp251x`
-
-**Load modules manually if needed:**
-```bash
-sudo modprobe can
-sudo modprobe can_raw
-sudo modprobe can_dev
-sudo modprobe mcp251x
-```
-
-### Issue: "Device or resource busy"
-
-Reset the CAN interfaces:
-```bash
-sudo ip link set can0 down
-sudo ip link set can1 down
+sudo ip link set can0 type can bitrate 500000
+sudo ip link set can1 type can bitrate 500000
 sudo ip link set can0 up
 sudo ip link set can1 up
 ```
 
-### Issue: Wrong oscillator frequency
+Hardware varies by install (e.g., Waveshare Dual CAN Hat on a Raspberry Pi). Ensure the radar’s radar-bus pair is wired to the `radar_channel` and the car-bus pair to the `car_channel`.
 
-If CAN communication is unreliable, you may have the wrong oscillator setting. Check your Waveshare model and adjust in `/boot/config.txt`:
+### Radar Connector Pinout
 
-- 8 MHz: `oscillator=8000000`
-- 12 MHz: `oscillator=12000000`
-- 16 MHz: `oscillator=16000000`
+![Connector Pinout](connector.jpg)
 
-After changes, reboot:
+| Pin | Signal            |
+|----:|-------------------|
+| 1   | GND               |
+| 2   | Car CAN Low       |
+| 3   | Car CAN High      |
+| 5   | Radar CAN High    |
+| 6   | Radar CAN Low     |
+| 8   | +12 V VCC         |
+
+The examples in this repository assume:
+
+- Car CAN (pins 2/3) → `can0`
+- Radar CAN (pins 5/6) → `can1`
+(if it doesn't work, flip can0 and can1)
+
+## Using the Radar Driver
+
 ```bash
-sudo reboot
+python3 radar_callbacks.py
 ```
 
-### Issue: Permission denied
+This starts the driver, registers a simple logging callback, and prints a running summary. Key flags:
 
-Make sure you're running with sudo:
-```bash
-sudo python3 spoof_dsu.py
+- `--radar-channel` / `--car-channel` – override SocketCAN interface names.
+- `--radar-dbc` / `--control-dbc` – use alternate DBCs.
+- `--no-setup` – skip `ip link` configuration if you manage it externally.
+- `--no-keepalive` – disable the internal keep-alive loop if another ECU already satisfies the radar.
+
+To embed in another project:
+
+```python
+from toyota_radar_driver import ToyotaRadarDriver, ToyotaRadarConfig
+
+config = ToyotaRadarConfig()
+driver = ToyotaRadarDriver(config)
+
+def on_track(track):
+    print(track.track_id, track.long_dist, track.lat_dist)
+
+driver.register_track_callback(on_track)
+driver.start()
 ```
 
-### Checking CAN Bus Statistics
+Call `driver.stop()` during shutdown to tear down threads and CAN handles.
+
+## Curses Visualization
 
 ```bash
-ip -details -statistics link show can0
-ip -details -statistics link show can1
+python3 radar_curses.py
 ```
 
-Look for errors in the output. High error counts indicate wiring or bitrate issues.
+The UI shows a plan-view grid of targets and a textual panel with distances, lateral offsets, relative speed, and track age. Press `q` to exit. Tune layout/behavior with flags such as `--max-long`, `--max-lat`, and `--refresh-hz`.
 
-## Safety Warning
+## Legacy Scripts
 
-⚠️ **WARNING**: This system interfaces with automotive safety equipment. Always test in a safe environment with the vehicle stationary. Never test while driving. Understand the risks involved when working with vehicle systems.
+`toyota_radar_debug.py` and `toyota_radar_rpi.py` remain for reference. They predate the modular driver, print raw traffic, and send static spoofing frames.
 
-## Additional Resources
+## Development Notes
 
-- [Waveshare CAN HAT Wiki](https://www.waveshare.com/wiki/RS485_CAN_HAT)
-- [SocketCAN Documentation](https://www.kernel.org/doc/html/latest/networking/can.html)
-- [Original Repository](https://github.com/frk2/toyoyta_radar_control_can)
-- [OpenPilot](https://github.com/commaai/openpilot)
+- The repo tracks the OpenDBC submodule; run `git submodule update --init --recursive` after cloning.
+- Avoid running multiple radar scripts simultaneously — only one process should own the CAN buses.
+- When modifying the driver, keep the callback API stable so dependent apps only need to register hooks.
+
+Contributions welcome: file issues or PRs for additional vehicles, visualizations, or integrations.
