@@ -68,6 +68,7 @@ The examples in this repository assume:
 
 - Car CAN (pins 2/3) → `can0`
 - Radar CAN (pins 5/6) → `can1`
+  
 (if it doesn't work, flip can0 and can1)
 
 ## Using the Radar Driver
